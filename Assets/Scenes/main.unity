@@ -163,7 +163,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3121a9c660dd7524e8ff61cf753030bd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  IterationCount: 10
+  IterationCount: 5
   _cubePrefab: {fileID: 7637464379934499641, guid: 9f849be04db9a4145bc5fa6111d170c1, type: 3}
   _linePrefab: {fileID: 4274224027982245568, guid: 69606b3766c48984e839c9fcb3c44e9d, type: 3}
 --- !u!1 &316075900
