@@ -9,13 +9,14 @@ namespace Ceramic_3d_Pavlov.Scripts
 {
     public class MatrixMatcher : MonoBehaviour
     {
-        public int IterationCount = 100;
+        public int IterationCount = 10;
         
         [SerializeField] private GameObject _cubePrefab;
         [SerializeField] private GameObject _linePrefab;
 
         private List<Matrix4x4> _modelMatrices;
         private List<Matrix4x4> _spaceMatrices;
+        private List<Matrix4x4> _offsetMatrices = new();
         
         private GameObject _modelCube;
         private readonly List<GameObject> _lines = new();
@@ -26,6 +27,7 @@ namespace Ceramic_3d_Pavlov.Scripts
         {
             LoadMatrices();
             
+            Debug.Log("Starting the search for offsets");
             _cancellationTokenSource = new CancellationTokenSource();
             _ = FindShiftsUseInverse(IterationCount, _cancellationTokenSource.Token);
         }
@@ -46,17 +48,15 @@ namespace Ceramic_3d_Pavlov.Scripts
                 string json = File.ReadAllText(path);
                 return JsonHelper.FromJson(json);
             }
-            else
-            {
-                Debug.LogError("Cannot find file: " + path);
-                return new List<Matrix4x4>(Array.Empty<Matrix4x4>());
-            }
+            
+            Debug.LogError("Cannot find file: " + path);
+            return new List<Matrix4x4>(Array.Empty<Matrix4x4>());
         }
 
         private async Task FindShiftsUseInverse(int iterationCount, CancellationToken  cancellationToken)
         {
             int oneIterationNumber = _spaceMatrices.Count / iterationCount;
-            
+
             foreach (Matrix4x4 modelMatrix in _modelMatrices)
             {
                 for (int i = 1; i <= iterationCount; i++)
@@ -67,7 +67,7 @@ namespace Ceramic_3d_Pavlov.Scripts
                     _modelCube = Instantiate(_cubePrefab, modelPosition, Quaternion.identity);
                     _modelCube.GetComponent<Renderer>().material.color = Color.blue;
 
-                    await FindShift(modelMatrix, oneIterationNumber, i);
+                    await FindOffsets(modelMatrix, oneIterationNumber, i);
                     await Task.Delay(50);
 
                     foreach (GameObject line in _lines)
@@ -82,23 +82,27 @@ namespace Ceramic_3d_Pavlov.Scripts
                 
                 await Task.Delay(50);
             }
+
+            Debug.Log("Matrix calculated!");
+            SaveMatrices(_offsetMatrices);
         }
 
-        private Task FindShift(Matrix4x4 modelMatrix, int oneIterationNumber, int index)
+        private Task FindOffsets(Matrix4x4 modelMatrix, int oneIterationNumber, int index)
         {
             for (int j = oneIterationNumber * (index - 1); j < oneIterationNumber * index; j++)
             {
                 Matrix4x4 modelInverse = Matrix4x4.Inverse(modelMatrix);
             
                 Matrix4x4 offsetMatrix = modelInverse * _spaceMatrices[j];
-            
-                VisualizeShift(offsetMatrix);
+                _offsetMatrices.Add(offsetMatrix);
+                
+                VisualizeFind(offsetMatrix);
             }
             
             return Task.CompletedTask;
         }
 
-        private void VisualizeShift(Matrix4x4 shift)
+        private void VisualizeFind(Matrix4x4 shift)
         {
             Vector3 spacePosition = new Vector3(shift.m03, shift.m13, shift.m23);
             
@@ -121,6 +125,46 @@ namespace Ceramic_3d_Pavlov.Scripts
         private void OnDestroy()
         {
             _cancellationTokenSource.Cancel();
+        }
+        
+        private void SaveMatrices(List<Matrix4x4> matrices)
+        {
+            Matrix4x4Array matrixArray = new Matrix4x4Array();
+            matrixArray.matrices = new Matrix4x4Data[matrices.Count];
+
+            for (int i = 0; i < matrices.Count; i++)
+            {
+                matrixArray.matrices[i] = ConvertToMatrix4x4Data(matrices[i]);
+            }
+
+            string json = JsonUtility.ToJson(matrixArray, true);
+
+            File.WriteAllText(Application.streamingAssetsPath + "/offsets.json", json);
+
+            Debug.Log("Matrices saved to: " + Application.streamingAssetsPath + "/offsets.json");
+        }
+
+        private Matrix4x4Data ConvertToMatrix4x4Data(Matrix4x4 matrix)
+        {
+            return new Matrix4x4Data
+            {
+                m00 = matrix.m00,
+                m10 = matrix.m10,
+                m20 = matrix.m20,
+                m30 = matrix.m30,
+                m01 = matrix.m01,
+                m11 = matrix.m11,
+                m21 = matrix.m21,
+                m31 = matrix.m31,
+                m02 = matrix.m02,
+                m12 = matrix.m12,
+                m22 = matrix.m22,
+                m32 = matrix.m32,
+                m03 = matrix.m03,
+                m13 = matrix.m13,
+                m23 = matrix.m23,
+                m33 = matrix.m33
+            };
         }
     }
     
